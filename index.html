@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: slim header with a segmented progress bar, a filter row, then four columns that scroll sideways as one strip on narrow screens. */
+:root {
+  --bg: #eef1f5; --surface: #ffffff; --column: #e3e8ee; --ink: #17202a; --muted: #5a6878;
+  --line: #cfd7e0; --accent: #3355cc; --on-accent: #ffffff; --done: #1f8a4c; --review: #a16a00; --danger: #b3261e;
+  --label-1: #b4491f; --label-2: #2f5fd0; --label-3: #7a4fc7; --label-4: #b0307a;
+  --label-5: #0e7c86; --label-6: #4d6b12; --label-7: #a16a00; --label-0: #5a6878;
+  --shadow: 0 1px 2px rgba(23, 32, 42, .08), 0 2px 8px rgba(23, 32, 42, .06);
+  --display: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11151b; --surface: #1c222b; --column: #171c24; --ink: #e6eaf0; --muted: #96a3b4;
+    --line: #2c3541; --accent: #8aa2ff; --on-accent: #0d1220; --done: #5fcf8c; --review: #e8b84a; --danger: #ff8a80;
+    --label-1: #f09a73; --label-2: #8fb0ff; --label-3: #b99cf5; --label-4: #f08cc0;
+    --label-5: #5fd0d8; --label-6: #a9cc5c; --label-7: #e8b84a; --label-0: #96a3b4;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 2px 8px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-block: 24px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 18px; }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
+h1 { font-family: var(--display); font-size: 28px; font-weight: 700; letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); margin: 2px 0 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 14px; font-weight: 500; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.progress { display: flex; flex-direction: column; gap: 6px; }
+.bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--line); }
+.bar span { display: block; transition: width .4s ease; }
+.bar .s-done { background: var(--done); } .bar .s-doing { background: var(--accent); }
+.progress p { margin: 0; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.progress strong { color: var(--ink); font-weight: 600; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.filters label { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
+select, input[type="text"], input[type="url"], input[type="email"], input[type="password"], textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+.note { margin: 0; padding: 10px 14px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+
+.board { overflow-x: auto; margin-inline: -4px; padding: 4px; }
+.cols { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(250px, 1fr)); gap: 14px; align-items: start; }
+.col { background: var(--column); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col h2 { font-family: var(--display); font-size: 15px; font-weight: 600; margin: 0; padding: 2px 4px; display: flex; justify-content: space-between; align-items: center; }
+.col h2 .count { font-family: var(--body); font-weight: 500; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.col.is-active h2 { color: var(--accent); }
+.col.is-done h2 { color: var(--done); }
+.list { display: flex; flex-direction: column; gap: 8px; min-height: 64px; }
+.list:empty::after { content: attr(data-empty); color: var(--muted); font-size: 13px; text-align: center; padding: 20px 8px; border: 1px dashed var(--line); border-radius: 8px; }
+
+.card { background: var(--surface); border-radius: 8px; padding: 10px 12px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px; cursor: grab; border-left: 3px solid var(--t); min-width: 0; }
+.card .title { font-weight: 600; overflow-wrap: anywhere; }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.tag { color: var(--t); background: color-mix(in srgb, var(--t) 14%, var(--surface)); border-radius: 999px; padding: 1px 8px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+.card .notes { margin: 0; font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.card .row { display: flex; gap: 6px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.card a { color: var(--accent); font-size: 13px; font-weight: 500; text-decoration: none; }
+.card a:hover { text-decoration: underline; }
+.mini { border: 1px solid var(--line); background: transparent; border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--muted); }
+.mini:hover { color: var(--ink); border-color: var(--muted); }
+.mini.next { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.col.is-done .card .title { text-decoration: line-through; text-decoration-color: var(--muted); color: var(--muted); }
+.ghost { opacity: .35; }
+.chosen { cursor: grabbing; }
+.t-0 { --t: var(--label-0); } .t-1 { --t: var(--label-1); } .t-2 { --t: var(--label-2); } .t-3 { --t: var(--label-3); }
+.t-4 { --t: var(--label-4); } .t-5 { --t: var(--label-5); } .t-6 { --t: var(--label-6); } .t-7 { --t: var(--label-7); }
+@keyframes landed { 0% { transform: scale(.96); box-shadow: 0 0 0 0 var(--done); } 45% { transform: scale(1.03); box-shadow: 0 0 0 6px color-mix(in srgb, var(--done) 35%, transparent); } 100% { transform: scale(1); box-shadow: var(--shadow); } }
+.card.landed { animation: landed .6s ease; }
+@media (prefers-reduced-motion: reduce) { .card.landed { animation: none; } .bar span { transition: none; } }
+
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); padding: 20px; width: min(480px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(10, 14, 20, .5); }
+dialog h3, .login h2 { font-family: var(--display); font-size: 18px; margin: 0 0 14px; }
+.form { display: flex; flex-direction: column; gap: 12px; }
+.form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; }
+.form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form input, .form select, .form textarea { width: 100%; color: var(--ink); }
+.form textarea { min-height: 90px; resize: vertical; }
+.form .end { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; margin-top: 4px; }
+.form .end div { display: flex; gap: 8px; }
+.login { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: min(380px, 100%); margin: 24px auto 0; }
+.login .error { color: var(--danger); font-size: 13px; margin: 0; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 14px; max-width: calc(100vw - 32px); z-index: 20; }
+@media (max-width: 720px) {
+  .cols { grid-template-columns: repeat(var(--cols, 4), 82vw); }
+  .board { scroll-snap-type: x mandatory; }
+  .col { scroll-snap-align: start; }
+  h1 { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1 id="board-title">Board</h1>
+      <p class="sub" id="board-sub" hidden></p>
+    </div>
+    <div class="actions" id="actions" hidden>
+      <button class="btn" id="signout">Sign out</button>
+      <button class="btn" id="export">Export CSV</button>
+      <button class="btn primary" id="add">+ Add card</button>
+    </div>
+  </header>
+
+  <p class="note" id="note" hidden></p>
+
+  <section class="login" id="login" hidden>
+    <form class="form" id="login-form">
+      <h2>Sign in</h2>
+      <label for="l-email">Email <input type="email" id="l-email" autocomplete="username" required></label>
+      <label for="l-password">Password <input type="password" id="l-password" autocomplete="current-password" required></label>
+      <p class="error" id="l-error" hidden></p>
+      <button type="submit" class="btn primary" id="l-submit">Sign in</button>
+    </form>
+  </section>
+
+  <main id="app" hidden>
+    <div class="wrap" style="padding: 0; max-width: none;">
+      <section class="progress" aria-label="Progress">
+        <div class="bar" id="bar"><span class="s-done"></span><span class="s-doing"></span></div>
+        <p id="summary">Loading your cards…</p>
+      </section>
+
+      <div class="filters">
+        <label for="filter-type">Type <select id="filter-type"><option value="">All</option></select></label>
+        <label for="filter-topic">Topic <select id="filter-topic"><option value="">All</option></select></label>
+        <button class="mini" id="clear-filters" hidden>Clear filters</button>
+      </div>
+
+      <div class="board">
+        <div class="cols" id="cols"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<dialog id="dlg">
+  <form class="form" id="form">
+    <h3 id="dlg-title">Add card</h3>
+    <label for="f-title">Title <input type="text" id="f-title" required maxlength="200"></label>
+    <div class="two">
+      <label for="f-type">Type <select id="f-type"></select></label>
+      <label for="f-status">Column <select id="f-status"></select></label>
+    </div>
+    <label for="f-topic">Topic <input type="text" id="f-topic" list="topics" maxlength="60"></label>
+    <datalist id="topics"></datalist>
+    <label for="f-url">Link <input type="url" id="f-url" placeholder="https://"></label>
+    <label for="f-notes">Notes <textarea id="f-notes" maxlength="4000"></textarea></label>
+    <div class="end">
+      <button type="button" class="btn danger" id="f-delete" hidden>Delete</button>
+      <div>
+        <button type="button" class="btn" id="f-cancel">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2/dist/umd/supabase.js"></script>
+<!-- Your settings live in config.js (copy config.example.js to create it). -->
+<script src="config.js"></script>
+<script>
+(function () {
+  var CFG = window.BOARD_CONFIG || {};
+  var DEFAULT_COLUMNS = [
+    { id: "todo", name: "To do" },
+    { id: "doing", name: "In progress" },
+    { id: "review", name: "Review" },
+    { id: "done", name: "Done" }
+  ];
+  // The first column is "not started" and the last is "done"; everything between counts as under way.
+  var STATUSES = (Array.isArray(CFG.columns) && CFG.columns.length >= 2 ? CFG.columns : DEFAULT_COLUMNS)
+    .map(function (c) { return { id: String(c.id), name: String(c.name || c.id) }; });
+  var TYPES = Array.isArray(CFG.types) && CFG.types.length ? CFG.types.map(String) : ["task", "idea", "bug", "reading"];
+  var FIRST = STATUSES[0].id, LAST = STATUSES[STATUSES.length - 1].id;
+  var $ = function (id) { return document.getElementById(id); };
+  var sb = null, channel = null, signedIn = false;
+  var cards = [], loaded = false, dragging = false, editingId = null, landedId = null, queues = {};
+  var lists = {};
+
+  function h(tag, props) {
+    var el = document.createElement(tag);
+    for (var k in (props || {})) {
+      if (k === "text") el.textContent = props[k];
+      else if (k === "on") for (var ev in props.on) el.addEventListener(ev, props.on[ev]);
+      else el.setAttribute(k, props[k]);
+    }
+    for (var i = 2; i < arguments.length; i++) if (arguments[i]) el.appendChild(arguments[i]);
+    return el;
+  }
+  function toast(msg) {
+    var t = $("toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.timer); toast.timer = setTimeout(function () { t.hidden = true; }, 3500);
+  }
+  function note(msg) { var el = $("note"); el.hidden = !msg; el.textContent = msg || ""; }
+  function typeOf(c) { return c.type ? String(c.type) : ""; }
+  // Types listed in the config get one of seven colours in order; anything else is grey.
+  function colorClass(c) { var i = TYPES.indexOf(typeOf(c)); return "t-" + (i < 0 ? 0 : i % 7 + 1); }
+  function safeUrl(u) { return typeof u === "string" && /^https?:\/\//i.test(u) ? u : ""; }
+  function inStatus(s) { return cards.filter(function (c) { return c.status === s; }).sort(function (a, b) { return (a.order || 0) - (b.order || 0); }); }
+  function find(id) { for (var i = 0; i < cards.length; i++) if (cards[i].id === id) return cards[i]; return null; }
+
+  // The database column is sort_order ("order" is a reserved word in SQL).
+  function fromRow(r) {
+    var ok = STATUSES.some(function (s) { return s.id === r.status; });
+    return { id: r.id, title: r.title, type: r.type, topic: r.topic || "", url: r.url || "", notes: r.notes || "", status: ok ? r.status : FIRST, order: Number(r.sort_order) || 0 };
+  }
+  function toRow(c) {
+    var row = {};
+    ["title", "type", "topic", "url", "notes", "status"].forEach(function (k) { if (c[k] !== undefined) row[k] = c[k]; });
+    if (c.order !== undefined) row.sort_order = c.order;
+    return row;
+  }
+
+  var boardTitle = CFG.title ? String(CFG.title) : "Board";
+  document.title = boardTitle;
+  $("board-title").textContent = boardTitle;
+  if (CFG.subtitle) { $("board-sub").textContent = String(CFG.subtitle); $("board-sub").hidden = false; }
+  $("cols").style.setProperty("--cols", STATUSES.length);
+
+  // Build the columns once; only their cards are re-rendered.
+  STATUSES.forEach(function (s) {
+    var list = h("div", { class: "list", "data-status": s.id, "data-empty": "Loading…" });
+    var count = h("span", { class: "count" });
+    $("cols").appendChild(h("section", { class: "col" + (s.id === LAST ? " is-done" : s.id !== FIRST ? " is-active" : ""), "data-status": s.id }, h("h2", null, h("span", { text: s.name }), count), list));
+    lists[s.id] = { list: list, count: count };
+    if (window.Sortable) {
+      new Sortable(list, {
+        group: "board", animation: 160, ghostClass: "ghost", chosenClass: "chosen",
+        delay: 180, delayOnTouchOnly: true, filter: "a,button", preventOnFilter: false,
+        onStart: function () { dragging = true; },
+        onEnd: function (evt) {
+          dragging = false;
+          var id = evt.item.getAttribute("data-id");
+          var to = evt.to.getAttribute("data-status");
+          var prev = evt.item.previousElementSibling, next = evt.item.nextElementSibling;
+          var p = prev ? find(prev.getAttribute("data-id")) : null, n = next ? find(next.getAttribute("data-id")) : null;
+          var order = p && n ? (p.order + n.order) / 2 : p ? p.order + 1000 : n ? n.order - 1000 : 1000;
+          var card = find(id);
+          if (!card || (evt.from === evt.to && evt.oldIndex === evt.newIndex)) { render(); return; }
+          if (to === LAST && card.status !== LAST) landedId = id;
+          save(id, { status: to, order: order });
+        }
+      });
+    }
+  });
+
+  function cardEl(c) {
+    var nextCol = STATUSES[STATUSES.map(function (s) { return s.id; }).indexOf(c.status) + 1];
+    var url = safeUrl(c.url);
+    var el = h("article", { class: "card " + colorClass(c), "data-id": c.id },
+      h("div", { class: "title", text: c.title || "Untitled" }),
+      h("div", { class: "meta" }, typeOf(c) ? h("span", { class: "tag", text: typeOf(c) }) : null, c.topic ? h("span", { text: c.topic }) : null),
+      c.notes ? h("p", { class: "notes", text: c.notes }) : null,
+      h("div", { class: "row" },
+        h("span", null,
+          url ? h("a", { href: url, target: "_blank", rel: "noopener noreferrer", text: "Open link ↗" }) : null),
+        h("span", null,
+          h("button", { class: "mini", type: "button", text: "Edit", on: { click: function () { openDialog(c.id); } } }),
+          document.createTextNode(" "),
+          nextCol ? h("button", { class: "mini next", type: "button", text: nextCol.name + " →", on: { click: function () { advance(c.id); } } }) : null)));
+    if (c.id === landedId) { el.classList.add("landed"); landedId = null; }
+    return el;
+  }
+
+  function render() {
+    if (dragging) return;
+    var ft = $("filter-type").value, fp = $("filter-topic").value;
+    STATUSES.forEach(function (s) {
+      var all = inStatus(s.id);
+      var shown = all.filter(function (c) { return (!ft || typeOf(c) === ft) && (!fp || c.topic === fp); });
+      lists[s.id].list.replaceChildren.apply(lists[s.id].list, shown.map(cardEl));
+      lists[s.id].count.textContent = shown.length === all.length ? String(all.length) : shown.length + " of " + all.length;
+      lists[s.id].list.setAttribute("data-empty", !loaded ? "Loading…" : all.length && !shown.length ? "No cards match the filters" : s.id === FIRST && !cards.length ? "No cards yet. Use + Add card to create the first one." : "Drop a card here");
+    });
+    var total = cards.length, n = { doing: 0, done: 0 };
+    cards.forEach(function (c) { if (c.status === LAST) n.done++; else if (c.status !== FIRST) n.doing++; });
+    ["done", "doing"].forEach(function (k) { document.querySelector("#bar .s-" + k).style.width = (total ? n[k] / total * 100 : 0) + "%"; });
+    if (loaded) {
+      var s = $("summary"); s.replaceChildren();
+      s.appendChild(h("strong", { text: n.done + " of " + total + " done" }));
+      s.appendChild(document.createTextNode(" · " + n.doing + " under way"));
+    }
+    $("clear-filters").hidden = !(ft || fp);
+  }
+
+  function fillFilters() {
+    var types = {}, topics = {};
+    cards.forEach(function (c) { if (typeOf(c)) types[typeOf(c)] = 1; if (c.topic) topics[c.topic] = 1; });
+    [["filter-type", Object.keys(types).sort()], ["filter-topic", Object.keys(topics).sort()]].forEach(function (pair) {
+      var sel = $(pair[0]), cur = sel.value;
+      sel.replaceChildren(h("option", { value: "", text: "All" }));
+      pair[1].forEach(function (v) { sel.appendChild(h("option", { value: v, text: v })); });
+      sel.value = pair[1].indexOf(cur) >= 0 ? cur : "";
+    });
+    $("topics").replaceChildren.apply($("topics"), Object.keys(topics).sort().map(function (v) { return h("option", { value: v }); }));
+  }
+
+  // ---- Storage (Supabase) --------------------------------------------------
+  var pending = 0;
+  async function load() {
+    var res = await sb.from("cards").select("*");
+    if (res.error) { note("Your cards couldn't be loaded: " + res.error.message); return; }
+    if (pending) return; // a local change is still saving; the next refresh picks this up
+    cards = res.data.map(fromRow);
+    loaded = true; note("");
+    fillFilters(); render();
+  }
+  var reloadTimer = null;
+  function reloadSoon() { clearTimeout(reloadTimer); reloadTimer = setTimeout(function () { if (signedIn) load(); }, 400); }
+
+  // One write at a time per card: each save waits for the previous one to finish.
+  function save(id, patch) {
+    var card = find(id);
+    if (card) Object.assign(card, patch);
+    fillFilters(); render();
+    pending++;
+    queues[id] = (queues[id] || Promise.resolve()).then(function () { return sb.from("cards").update(toRow(patch)).eq("id", id); })
+      .then(function (res) { if (res && res.error) throw res.error; })
+      .catch(function () { toast("That change wasn't saved. Try it again."); })
+      .then(function () { pending--; });
+  }
+  function advance(id) {
+    var card = find(id); if (!card) return;
+    var i = STATUSES.map(function (s) { return s.id; }).indexOf(card.status);
+    var to = STATUSES[i + 1]; if (!to) return;
+    var top = inStatus(to.id)[0];
+    if (to.id === LAST) landedId = id;
+    save(id, { status: to.id, order: top ? top.order - 1000 : 1000 });
+  }
+  async function addCard(data) {
+    var res = await sb.from("cards").insert(toRow(data)).select().single();
+    if (res.error) { toast("The card wasn't added. Try it again."); return; }
+    if (!find(res.data.id)) cards.push(fromRow(res.data));
+    fillFilters(); render();
+  }
+  async function removeCard(id) {
+    cards = cards.filter(function (c) { return c.id !== id; }); fillFilters(); render();
+    var res = await sb.from("cards").delete().eq("id", id);
+    if (res.error) { toast("The card wasn't deleted. Try it again."); load(); }
+  }
+
+  // ---- Add / edit dialog ---------------------------------------------------
+  STATUSES.forEach(function (s) { $("f-status").appendChild(h("option", { value: s.id, text: s.name })); });
+  function openDialog(id) {
+    editingId = id || null;
+    var c = id ? find(id) : null;
+    $("dlg-title").textContent = c ? "Edit card" : "Add card";
+    $("f-title").value = c ? c.title || "" : "";
+    // Offer the configured types, plus this card's own type if it isn't one of them.
+    var type = c ? typeOf(c) : TYPES[0], sel = $("f-type");
+    var options = type && TYPES.indexOf(type) < 0 ? TYPES.concat([type]) : TYPES;
+    sel.replaceChildren.apply(sel, options.map(function (t) { return h("option", { value: t, text: t }); }));
+    sel.value = type || TYPES[0];
+    $("f-status").value = c ? c.status : FIRST;
+    $("f-topic").value = c ? c.topic || "" : "";
+    $("f-url").value = c ? c.url || "" : "";
+    $("f-notes").value = c ? c.notes || "" : "";
+    var del = $("f-delete"); del.hidden = !c; del.textContent = "Delete"; del.dataset.armed = "";
+    $("dlg").showModal();
+  }
+  $("add").addEventListener("click", function () { openDialog(null); });
+  $("f-cancel").addEventListener("click", function () { $("dlg").close(); });
+  $("f-delete").addEventListener("click", function () {
+    var del = $("f-delete");
+    if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "Confirm delete"; return; }
+    var id = editingId; $("dlg").close();
+    removeCard(id);
+  });
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var data = {
+      title: $("f-title").value.trim(), type: $("f-type").value, status: $("f-status").value,
+      topic: $("f-topic").value.trim(), url: $("f-url").value.trim(), notes: $("f-notes").value.trim()
+    };
+    if (!data.title) return;
+    var existing = editingId ? find(editingId) : null;
+    if (existing) {
+      if (existing.status !== data.status) {
+        var top = inStatus(data.status)[0];
+        data.order = top ? top.order - 1000 : 1000;
+        if (data.status === LAST) landedId = existing.id;
+      }
+      save(existing.id, data);
+    } else {
+      var col = inStatus(data.status);
+      data.order = col.length ? col[col.length - 1].order + 1000 : 1000;
+      addCard(data);
+    }
+    $("dlg").close();
+  });
+
+  $("filter-type").addEventListener("change", render);
+  $("filter-topic").addEventListener("change", render);
+  $("clear-filters").addEventListener("click", function () { $("filter-type").value = ""; $("filter-topic").value = ""; render(); });
+
+  // ---- Export --------------------------------------------------------------
+  function csvCell(v) { v = v == null ? "" : String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; }
+  $("export").addEventListener("click", function () {
+    var rows = [["Title", "Column", "Type", "Topic", "Link", "Notes"]];
+    STATUSES.forEach(function (s) { inStatus(s.id).forEach(function (c) { rows.push([c.title, s.name, typeOf(c), c.topic, c.url, c.notes]); }); });
+    var blob = new Blob([rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n")], { type: "text/csv" });
+    var a = h("a", { href: URL.createObjectURL(blob), download: "board.csv" });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  // ---- Sign in / out -------------------------------------------------------
+  function showSignedIn() {
+    if (signedIn) return;
+    signedIn = true;
+    $("login").hidden = true; $("app").hidden = false; $("actions").hidden = false;
+    render(); load();
+    // Live updates from your other devices; a refresh on returning to the tab covers any gap.
+    channel = sb.channel("cards-changes").on("postgres_changes", { event: "*", schema: "public", table: "cards" }, reloadSoon).subscribe();
+  }
+  function showSignedOut() {
+    signedIn = false; loaded = false; cards = [];
+    if (channel) { sb.removeChannel(channel); channel = null; }
+    $("login").hidden = false; $("app").hidden = true; $("actions").hidden = true;
+  }
+  $("login-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var err = $("l-error"), btn = $("l-submit");
+    err.hidden = true; btn.disabled = true;
+    var res = await sb.auth.signInWithPassword({ email: $("l-email").value.trim(), password: $("l-password").value });
+    btn.disabled = false;
+    if (res.error) { err.textContent = res.error.message; err.hidden = false; return; }
+    $("l-password").value = "";
+  });
+  $("signout").addEventListener("click", function () { sb.auth.signOut(); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && signedIn) reloadSoon(); });
+
+  // Accept the project URL with or without a trailing slash or the /rest/v1 suffix the dashboard sometimes shows.
+  var supabaseUrl = String(CFG.supabaseUrl || "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
+  var supabaseKey = String(CFG.supabaseKey || "").trim();
+  if (!window.supabase) { note("The Supabase library didn't load. Check your connection and reload."); return; }
+  if (!/^https?:\/\//.test(supabaseUrl) || !supabaseKey || /^PASTE_/.test(supabaseKey)) {
+    note("Almost there: copy config.example.js to config.js and add your Supabase project URL and publishable key.");
+    return;
+  }
+  sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+  sb.auth.onAuthStateChange(function (event, session) {
+    // Deferred so no Supabase call runs inside the auth callback itself.
+    setTimeout(function () { if (session) showSignedIn(); else showSignedOut(); }, 0);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# Your own Supabase project settings. Remove this line if you deploy straight
+# from the repository (for example with GitHub Pages); see the README.
+config.js
+
+.DS_Store
