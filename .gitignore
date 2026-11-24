@@ -3,3 +3,7 @@
 config.js
 
 .DS_Store
+
+# Raspberry Pi display settings (contains a password).
+pi/board.env
+__pycache__/

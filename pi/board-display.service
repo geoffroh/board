@@ -1,0 +1,15 @@
+[Unit]
+Description=Board progress display
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Change the user and paths if yours differ.
+User=rpi
+WorkingDirectory=/home/rpi/board/pi
+ExecStart=/home/rpi/board/pi/.venv/bin/python board_display.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

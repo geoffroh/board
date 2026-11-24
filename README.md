@@ -23,6 +23,7 @@ It does not work offline, and boards are per user: there are no shared boards.
 | `index.html` | The whole app. |
 | `config.example.js` | Template for your settings. Copy it to `config.js`. |
 | `setup.sql` | Creates the database table and its access rules. |
+| `pi/` | Optional extension: show your progress on a Raspberry Pi screen. Not needed to run the board. |
 
 ## Setup
 
@@ -79,6 +80,10 @@ Once it is hosted you can install it like an app: "Add to Dock" in Safari or "In
 - `index.html` loads [supabase-js](https://github.com/supabase/supabase-js) and [SortableJS](https://github.com/SortableJS/Sortable) from public CDNs, pinned to fixed versions. There is no server code of its own.
 - Cards are rows in one `cards` table. A card's column is its `status`, and its position within the column is `sort_order`. Moving a card writes only that one row.
 - The page subscribes to changes on the table and reloads the cards when one arrives, and again whenever you return to the tab.
+
+## Optional extension: Raspberry Pi display
+
+The `pi/` folder is an optional extra and the board works without it. It holds a small Python script that shows your progress on a [Pimoroni Display HAT Mini](https://shop.pimoroni.com/products/display-hat-mini) attached to a Raspberry Pi: one square per card, coloured from red (not started) to green (done). See [pi/README.md](pi/README.md).
 
 ## Licence
 
